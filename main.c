@@ -99,19 +99,21 @@ void edit_mode(){
                 temp_month = "DEC";
             }
             int i;
-            for (i = 0; i < 3; i++)
-            {
-                new_date[i] = temp_month[i];
-            }
+            //displays the temp month where the actual month is
+            //cover the displayed info with this
             Graphics_drawStringCentered(&g_sContext, temp_month,
-                                        6, 28, 30,
+                                        3, 28, 30,
                                         OPAQUE_TEXT);
             Graphics_drawLine(&g_sContext, 20, 34, 34, 34);
             Graphics_flushBuffer(&g_sContext);
+            if(!(P2IN&BIT1)){
+                edit_state++;
+            }
             break;
         }
         case 1:
         {
+
             break;
         }
         case 2:{
@@ -251,6 +253,7 @@ void print_month_day(char month[3], char day[2], unsigned int days){
     for(i=0; i<3; i++){
         month[i]=month_store[i];
     }
+    days+=1;
     day[0]=(days/10)+0x30;
     day[1]=(days%10)+0x30;
 }
@@ -312,12 +315,11 @@ void print_temp(char final_temp_disp[6], volatile int final_temp, char unit)
 }
 
 void disp_temp(){
-    //TODO add calibration stuff here
-    //get calibration values for the adc voltage (1.5V)
+    //calibration vals for temp
     unsigned int CALADC12_15V_30C = *((unsigned int *) 0x1A1A);
     unsigned int CALADC12_15V_85C = *((unsigned int *) 0x1A1C);
 
-    //calculate temperature from adc code value considering calibration values
+    //calculate temperature
     //convert from celsius to fahrenheit
     float denom = (float) (CALADC12_15V_85C) - (float) (CALADC12_15V_30C);
     float conversion = ((float) (85.0 - 30.0)) / denom;
