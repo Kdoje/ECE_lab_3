@@ -14,10 +14,10 @@ const unsigned int days_sep = 31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30;
 const unsigned int days_oct = 31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31;
 const unsigned int days_nov = 31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31
         + 30;
-const unsigned int days_to_sec = 24 * 60 * 60;
-const unsigned int hours_to_sec = 60 * 60;
-const unsigned int mins_to_sec = 60;
-unsigned int utc_secs=0;
+const unsigned long  days_to_sec = 86400;
+const unsigned long  hours_to_sec = 60 * 60;
+const unsigned long  mins_to_sec = 60;
+unsigned long utc_secs=0;
 unsigned char edit_state=0;
 bool done_editing=true;
 unsigned int month, days, hours, minutes, seconds;
@@ -53,7 +53,29 @@ void main(void)
       }
   }
 }
-
+unsigned long  calc_seconds(int month_no, int day_no, int hr_no, int min_no, int sec_no){
+    unsigned long new_seconds=0;
+    int i;
+    for (i=month_no; i > 0; i--)//go to the number of months passed
+    {
+        if(i==2){
+            new_seconds += 28*days_to_sec;
+        }
+        else if (i==4||i==6||i==9||i==11)
+        {
+            new_seconds += 30*days_to_sec;
+        }
+        else if(i==1||i==3||i==5||i==7||i==8||i==10)
+        {
+            new_seconds += 31*days_to_sec;
+        } //subtracts one from each so I can add one to day_no and adjust it
+    }
+    new_seconds+=(day_no-1)*days_to_sec;
+    new_seconds+=hr_no*hours_to_sec;
+    new_seconds+=min_no*mins_to_sec;
+    new_seconds+=sec_no;
+    return new_seconds;
+}
 void edit_mode(){
     char new_date[6];
     strncpy(new_date, "JAN:00",6);
@@ -70,10 +92,6 @@ void edit_mode(){
             if(edit_state>4){
                 edit_state=0;
             }
-            swDelay(1);
-        }
-        if(!(P2IN&BIT1)){
-            done_editing=true;
             swDelay(1);
         }
         switch (edit_state)
@@ -94,11 +112,11 @@ void edit_mode(){
             }
             else if (scroll < 1365){
                 month_no=3;
-                strncpy(temp_month, "JAN",3);
+                strncpy(temp_month, "APR",3);
             }
             else if (scroll < 1707){
                 month_no=4;
-                strncpy(temp_month, "JUL",3);
+                strncpy(temp_month, "MAY",3);
             }
             else if (scroll < 2048){
                 month_no=5;
@@ -142,30 +160,30 @@ void edit_mode(){
             int daysInMonth=0;
             if (month_no == 1)
             {
-                daysInMonth = 28-1;
+                daysInMonth = 28;
             }
-            if (month_no == 3 || month_no == 5
+            else if (month_no == 3 || month_no == 5
                     || month_no == 8 || month_no == 10)
             {
-                daysInMonth = 30-1;
+                daysInMonth = 30;
             }
             else
             {
-                daysInMonth = 31-1;
+                daysInMonth = 31;
             }//subtracts one from each so I can add one to day_no and adjust it
-            float monthScale = daysInMonth / 4096.0;
+            float monthScale = (float)(daysInMonth) / 4096.0;
             day_no = monthScale * scroll;
             day_no += 1;            //here's the correction
             new_date[4] = (day_no / 10) + 0x30;
             new_date[5] = (day_no % 10) + 0x30;
-            Graphics_drawStringCentered(&g_sContext, new_date, 6, 32, 15,
-            OPAQUE_TEXT);
+            Graphics_drawStringCentered(&g_sContext, new_date, 6, 40, 15,
+             OPAQUE_TEXT);
             Graphics_flushBuffer(&g_sContext);
             break;
         }
         case 2:
         {
-            float hourScale = 24 / 4096;
+            float hourScale = 24.0 / 4096.0;
             int hours = hourScale * scroll;
             hr_no=hours;
             new_time[0] = (hours / 10) + 0x30;
@@ -177,30 +195,33 @@ void edit_mode(){
         }
         case 3:
         {
-            float timeScale = 60 / 4096;
+            float timeScale = 60.0 / 4096.0;
             int minutes = timeScale * scroll;
             min_no=minutes;
             new_time[3] = (minutes / 10) + 0x30;
             new_time[4] = (minutes % 10) + 0x30;
             Graphics_drawStringCentered(&g_sContext, new_time, 8, 40, 25,
             OPAQUE_TEXT);
-            Graphics_drawLine(&g_sContext, 20, 34, 34, 34);
             Graphics_flushBuffer(&g_sContext);
             break;
         }
         case 4:
         {
-            float timeScale = 60 / 4096;
+            float timeScale = 60.0 / 4096.0;
             int seconds = timeScale * scroll;
             sec_no=seconds;
             new_time[6] = (seconds / 10) + 0x30;
             new_time[7] = (seconds % 10) + 0x30;
             Graphics_drawStringCentered(&g_sContext, new_time, 8, 40, 25,
             OPAQUE_TEXT);
-            Graphics_drawLine(&g_sContext, 20, 34, 34, 34);
             Graphics_flushBuffer(&g_sContext);
             break;
         }
+        }
+        if(!(P2IN&BIT1)){
+            utc_secs = calc_seconds(month_no, day_no, hr_no, min_no, sec_no);
+            done_editing=true;
+            swDelay(1);
         }
     }
 }
@@ -336,7 +357,7 @@ void print_month_day(char month[3], char day[2], unsigned int days){
 }
 void disp_time(){
     //month, days, hours, mins, secs;
-    unsigned int cur_secs = utc_secs;
+    unsigned long cur_secs = utc_secs;
     char month[3], day[2];
     char months_and_days[6];
     char clock_time[8];
