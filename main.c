@@ -1,5 +1,6 @@
 #include <msp430.h>
 #include <stdlib.h>
+#include <string.h>
 #include "peripherals.h"
 const unsigned int days_jan = 31;
 const unsigned int days_feb = 31 + 28;
@@ -18,7 +19,7 @@ const unsigned int hours_to_sec = 60 * 60;
 const unsigned int mins_to_sec = 60;
 unsigned int utc_secs=0;
 unsigned char edit_state=0;
-bool done_editing=false;
+bool done_editing=true;
 unsigned int month, days, hours, minutes, seconds;
 unsigned int temp=0;
 unsigned int temp_buffer_f[60]={0};
@@ -46,84 +47,158 @@ void main(void)
   run_timer();
   while(1){
       if(!(P2IN&BIT1)){
+          done_editing=false;
+          swDelay(1);
           edit_mode();
       }
   }
 }
 
 void edit_mode(){
-    volatile char *new_date="JAN:00";
-    volatile char *new_time="00:00:00";
-    volatile char *temp_month="JAN";
-    volatile char *temp_day="00";
+    char new_date[6];
+    strncpy(new_date, "JAN:00",6);
+    char new_time[8];
+    strncpy(new_time, "00:00:00",8);
+    char temp_month[4];
+    strncpy(temp_month, "JAN",3);
+    int month_no, day_no, hr_no,min_no,sec_no;
+    month_no=day_no=hr_no=min_no=sec_no=0;
     while(!done_editing){
         ADC12CTL0 |= ADC12ENC + ADC12SC;
+        if(!(P1IN&BIT1)){
+            edit_state++;
+            if(edit_state>4){
+                edit_state=0;
+            }
+            swDelay(1);
+        }
+        if(!(P2IN&BIT1)){
+            done_editing=true;
+            swDelay(1);
+        }
         switch (edit_state)
         {
         case 0:
         {
             if (scroll < 341){
-                temp_month = "JAN";
+                strncpy(temp_month, "JAN",3);
+                month_no=0;
             }
             else if (scroll < 683){
-                temp_month = "FEB";
+                strncpy(temp_month, "FEB",3);
+                month_no=1;
             }
             else if (scroll < 1024){
-                temp_month = "MAR";
+                month_no=2;
+                strncpy(temp_month, "MAR",3);
             }
             else if (scroll < 1365){
-                temp_month = "APR";
+                month_no=3;
+                strncpy(temp_month, "JAN",3);
             }
             else if (scroll < 1707){
-                temp_month = "MAY";
+                month_no=4;
+                strncpy(temp_month, "JUL",3);
             }
             else if (scroll < 2048){
-                temp_month = "JUN";
+                month_no=5;
+                strncpy(temp_month, "JUN",3);
             }
             else if (scroll < 2389){
-                temp_month = "JUL";
+                month_no=6;
+                strncpy(temp_month, "JUL",3);
             }
             else if (scroll < 2731){
-                temp_month = "AUG";
+                month_no=7;
+                strncpy(temp_month, "AUG",3);
             }
             else if (scroll < 3072){
-                temp_month = "SEP";
+                month_no=8;
+                strncpy(temp_month, "SEP",3);
             }
             else if (scroll < 3413){
-                temp_month = "OCT";
+                month_no=9;
+                strncpy(temp_month, "OCT",3);
             }
             else if (scroll < 3755){
-                temp_month = "NOV";
+                month_no=10;
+                strncpy(temp_month, "NOV",3);
             }
             else if (scroll < 4096){
-                temp_month = "DEC";
+                month_no=11;
+                strncpy(temp_month, "DEC",3);
             }
-            int i;
             //displays the temp month where the actual month is
             //cover the displayed info with this
-            Graphics_drawStringCentered(&g_sContext, temp_month,
-                                        3, 28, 30,
-                                        OPAQUE_TEXT);
-            Graphics_drawLine(&g_sContext, 20, 34, 34, 34);
+            strncpy(new_date, temp_month, 3);
+            Graphics_drawStringCentered(&g_sContext, new_date, 6, 40, 15,
+             OPAQUE_TEXT);
             Graphics_flushBuffer(&g_sContext);
-            if(!(P2IN&BIT1)){
-                edit_state++;
-            }
+
             break;
         }
         case 1:
         {
-
+            int daysInMonth=0;
+            if (month_no == 1)
+            {
+                daysInMonth = 28-1;
+            }
+            if (month_no == 3 || month_no == 5
+                    || month_no == 8 || month_no == 10)
+            {
+                daysInMonth = 30-1;
+            }
+            else
+            {
+                daysInMonth = 31-1;
+            }//subtracts one from each so I can add one to day_no and adjust it
+            float monthScale = daysInMonth / 4096.0;
+            day_no = monthScale * scroll;
+            day_no += 1;            //here's the correction
+            new_date[4] = (day_no / 10) + 0x30;
+            new_date[5] = (day_no % 10) + 0x30;
+            Graphics_drawStringCentered(&g_sContext, new_date, 6, 32, 15,
+            OPAQUE_TEXT);
+            Graphics_flushBuffer(&g_sContext);
             break;
         }
-        case 2:{
+        case 2:
+        {
+            float hourScale = 24 / 4096;
+            int hours = hourScale * scroll;
+            hr_no=hours;
+            new_time[0] = (hours / 10) + 0x30;
+            new_time[1] = (hours % 10) + 0x30;
+            Graphics_drawStringCentered(&g_sContext, new_time, 8, 40, 25,
+            OPAQUE_TEXT);
+            Graphics_flushBuffer(&g_sContext);
             break;
         }
-        case 3:{
+        case 3:
+        {
+            float timeScale = 60 / 4096;
+            int minutes = timeScale * scroll;
+            min_no=minutes;
+            new_time[3] = (minutes / 10) + 0x30;
+            new_time[4] = (minutes % 10) + 0x30;
+            Graphics_drawStringCentered(&g_sContext, new_time, 8, 40, 25,
+            OPAQUE_TEXT);
+            Graphics_drawLine(&g_sContext, 20, 34, 34, 34);
+            Graphics_flushBuffer(&g_sContext);
             break;
         }
-        case 4:{
-
+        case 4:
+        {
+            float timeScale = 60 / 4096;
+            int seconds = timeScale * scroll;
+            sec_no=seconds;
+            new_time[6] = (seconds / 10) + 0x30;
+            new_time[7] = (seconds % 10) + 0x30;
+            Graphics_drawStringCentered(&g_sContext, new_time, 8, 40, 25,
+            OPAQUE_TEXT);
+            Graphics_drawLine(&g_sContext, 20, 34, 34, 34);
+            Graphics_flushBuffer(&g_sContext);
             break;
         }
         }
@@ -195,7 +270,9 @@ __interrupt void timer_tick (void)
     utc_secs++;
     ADC12CTL0 |= ADC12ENC + ADC12SC;
     disp_temp();
-    disp_time();
+    if(done_editing){
+        disp_time();
+    }
 }
 void print_month_day(char month[3], char day[2], unsigned int days){
     char *month_store="JAN";
